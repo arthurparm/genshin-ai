@@ -67,6 +67,28 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 0.3 - Run Session and Artifact Directories
+
+Goal: group runtime logs and future artifacts under one run-scoped directory.
+
+Tasks:
+
+- create RunSession
+- create run-scoped directories from run_id
+- write metadata.json for each run
+- route CLI JSONL logs to the run session logs directory
+- add tests for session directory creation and metadata
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `python -m genshin_ai.cli` creates `runs/<run_id>/`
+- each run directory contains metadata, logs, captures, replays, and artifacts paths
+- CLI logs are written to `runs/<run_id>/logs/events.jsonl`
+- no screen capture exists
+- no input automation exists
+- no LLM call exists
+
 ## FASE 1 - Capture and Observability
 
 Goal: capture frames and measure performance without acting on the game.

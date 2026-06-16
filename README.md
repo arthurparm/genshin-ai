@@ -129,6 +129,17 @@ Run CLI sanity check with an explicit config file:
 python -m genshin_ai.cli --config config.example.toml
 ```
 
+The CLI creates one run-scoped directory per execution:
+
+```text
+runs/<run_id>/
+  metadata.json
+  logs/events.jsonl
+  captures/
+  replays/
+  artifacts/
+```
+
 ## Configuration
 
 Configuration is loaded from safe defaults unless a TOML file is provided with

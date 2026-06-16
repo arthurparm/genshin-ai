@@ -7,6 +7,7 @@ from genshin_ai import __version__
 from genshin_ai.core.config import load_config
 from genshin_ai.core.logging import JsonlEventLogger, LogEvent, configure_console_logging
 from genshin_ai.core.runtime import RuntimeContext
+from genshin_ai.core.session import create_run_session
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -23,7 +24,12 @@ def main(argv: list[str] | None = None) -> None:
     configure_console_logging()
 
     runtime = RuntimeContext()
-    event_logger = JsonlEventLogger(runtime=runtime, log_dir=Path(config.logging.log_dir))
+    session = create_run_session(runtime=runtime, config=config)
+    event_logger = JsonlEventLogger(
+        runtime=runtime,
+        log_dir=session.logs_dir,
+        filename="events.jsonl",
+    )
 
     event_logger.emit(
         LogEvent(
@@ -35,6 +41,7 @@ def main(argv: list[str] | None = None) -> None:
                 "phase": runtime.project_phase,
                 "config_source": config_source,
                 "config": config.to_dict(),
+                "session": session.to_dict(),
             },
         )
     )
@@ -43,6 +50,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Run ID: {runtime.run_id}")
     print(f"Phase: {runtime.project_phase}")
     print(f"Config: {config_source}")
+    print(f"Run session: {session.root_dir}")
     print("Status: package import, runtime context, typed configuration, and logging OK")
 
 
