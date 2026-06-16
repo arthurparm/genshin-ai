@@ -22,6 +22,27 @@ Exit criteria:
 - project imports successfully
 - no gameplay automation exists
 
+## FASE 0.1 - Structured Logging
+
+Goal: establish structured logs before any capture, perception, execution, or planning module.
+
+Tasks:
+
+- create RuntimeContext
+- create JSONL event logger
+- emit CLI sanity event
+- create log directory automatically
+- add tests for logging and runtime metadata
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `python -m genshin_ai.cli` creates one JSONL log file
+- log entries include run_id, timestamp, module, event, level, phase, and data
+- no screen capture exists
+- no input automation exists
+- no LLM call exists
+
 ## FASE 1 - Capture and Observability
 
 Goal: capture frames and measure performance without acting on the game.
@@ -32,7 +53,6 @@ Tasks:
 - implement frame resize
 - measure capture FPS
 - save sample frames
-- create structured logging
 - create capture session output directory
 
 Exit criteria:
