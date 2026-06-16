@@ -5,12 +5,17 @@ from pathlib import Path
 
 from genshin_ai import __version__
 from genshin_ai.core.config import AppConfig, load_config
-from genshin_ai.core.logging import JsonlEventLogger, LogEvent, configure_console_logging
+from genshin_ai.core.logging import JsonlEventLogger, JsonValue, LogEvent, configure_console_logging
 from genshin_ai.core.runtime import RuntimeContext
 from genshin_ai.core.session import RunSession, create_run_session
 from genshin_ai.perception.capture import MockCaptureSource
 from genshin_ai.perception.frame import CapturedFrame
 from genshin_ai.perception.metrics import run_capture_smoke_test
+from genshin_ai.perception.preprocess import (
+    preprocess_bgra_frame,
+    processed_frame_sample_path,
+    save_processed_frame_sample_ppm,
+)
 from genshin_ai.perception.screen_capture import (
     MssScreenCaptureSource,
     ScreenCaptureDependencyError,
@@ -132,6 +137,7 @@ def _run_screen_capture_smoke_command(
             module="perception.screen_capture",
             data={
                 "frames": args.frames,
+                "preprocess": args.preprocess,
                 "save_samples": args.save_samples,
                 "config_source": config_source,
             },
@@ -155,10 +161,33 @@ def _run_screen_capture_smoke_command(
 
     def save_sample(frame: CapturedFrame) -> None:
         nonlocal saved_samples
-        output_path = save_frame_sample_ppm(
-            frame,
-            sample_frame_path(session.captures_dir, frame),
-        )
+        if args.preprocess:
+            processed_frame = preprocess_bgra_frame(
+                frame,
+                target_width=config.capture.process_width,
+                target_height=config.capture.process_height,
+            )
+            event_logger.emit(
+                LogEvent(
+                    event="frame_preprocessed",
+                    module="perception.preprocess",
+                    data=dict[str, JsonValue](processed_frame.metadata()),
+                )
+            )
+            output_path = save_processed_frame_sample_ppm(
+                processed_frame,
+                processed_frame_sample_path(session.captures_dir, processed_frame),
+            )
+            width = processed_frame.width
+            height = processed_frame.height
+        else:
+            output_path = save_frame_sample_ppm(
+                frame,
+                sample_frame_path(session.captures_dir, frame),
+            )
+            width = frame.width
+            height = frame.height
+
         saved_samples += 1
         event_logger.emit(
             LogEvent(
@@ -167,18 +196,39 @@ def _run_screen_capture_smoke_command(
                 data={
                     "frame_id": frame.frame_id,
                     "path": str(output_path),
-                    "width": frame.width,
-                    "height": frame.height,
+                    "width": width,
+                    "height": height,
+                    "preprocessed": args.preprocess,
                 },
             )
         )
+
+    def preprocess_only(frame: CapturedFrame) -> None:
+        processed_frame = preprocess_bgra_frame(
+            frame,
+            target_width=config.capture.process_width,
+            target_height=config.capture.process_height,
+        )
+        event_logger.emit(
+            LogEvent(
+                event="frame_preprocessed",
+                module="perception.preprocess",
+                data=dict[str, JsonValue](processed_frame.metadata()),
+            )
+        )
+
+    on_frame_captured = None
+    if args.save_samples:
+        on_frame_captured = save_sample
+    elif args.preprocess:
+        on_frame_captured = preprocess_only
 
     metrics = run_capture_smoke_test(
         source=source,
         logger=event_logger,
         frame_count=args.frames,
         target_fps=config.capture.target_fps,
-        on_frame_captured=save_sample if args.save_samples else None,
+        on_frame_captured=on_frame_captured,
     )
 
     event_logger.emit(
@@ -187,6 +237,7 @@ def _run_screen_capture_smoke_command(
             module="perception.screen_capture",
             data={
                 "frames": args.frames,
+                "preprocess": args.preprocess,
                 "saved_samples": saved_samples,
                 "metrics": metrics.to_dict(),
             },
@@ -203,6 +254,7 @@ def _run_screen_capture_smoke_command(
     print(f"Target FPS: {metrics.target_fps}")
     print(f"Actual FPS: {metrics.actual_fps:.2f}")
     print(f"Failed frames: {metrics.failed_frames}")
+    print(f"Preprocess: {args.preprocess}")
     print(f"Samples saved: {saved_samples}")
 
 
@@ -239,6 +291,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--save-samples",
         action="store_true",
         help="Save captured sample frames as PPM files.",
+    )
+    screen_capture_smoke_parser.add_argument(
+        "--preprocess",
+        action="store_true",
+        help="Preprocess captured frames to configured RGB resolution.",
     )
     screen_capture_smoke_parser.add_argument(
         "--config",

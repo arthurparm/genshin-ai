@@ -147,6 +147,7 @@ Run a bounded real screen-capture smoke test:
 ```powershell
 python -m genshin_ai.cli screen-capture-smoke --frames 5
 python -m genshin_ai.cli screen-capture-smoke --frames 5 --save-samples
+python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --save-samples
 ```
 
 The CLI creates one run-scoped directory per execution:
@@ -178,3 +179,8 @@ screen and does not interact with Genshin Impact.
 The `screen-capture-smoke` command uses the optional `mss` backend to capture the
 primary monitor. It is for manual observability testing only; it does not inspect
 game memory, automate input, or require Genshin Impact to be open.
+
+When `--preprocess` is enabled, captured BGRA frames are converted to RGB and
+resized to `capture.process_width` x `capture.process_height` from the loaded
+configuration. Processed samples are written as PPM files under the run captures
+directory when `--save-samples` is also enabled.

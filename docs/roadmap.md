@@ -140,6 +140,31 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.2 - Frame Preprocessing and Resize Pipeline
+
+Goal: convert captured BGRA frames to resized RGB frames before OCR or vision models exist.
+
+Tasks:
+
+- define ProcessedFrame
+- convert BGRA to RGB
+- resize frames with nearest-neighbor
+- save processed PPM samples
+- integrate `--preprocess` into `screen-capture-smoke`
+- log `frame_preprocessed` events
+- add unit tests independent from real capture
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `screen-capture-smoke --preprocess --save-samples` saves processed PPM files
+- processed frames use `capture.process_width` and `capture.process_height`
+- events include `frame_preprocessed`
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction
