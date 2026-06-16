@@ -122,3 +122,21 @@ Run CLI sanity check:
 ```powershell
 python -m genshin_ai.cli
 ```
+
+Run CLI sanity check with an explicit config file:
+
+```powershell
+python -m genshin_ai.cli --config config.example.toml
+```
+
+## Configuration
+
+Configuration is loaded from safe defaults unless a TOML file is provided with
+`--config`.
+
+Use `config.example.toml` as the versioned reference. Local machine-specific config
+should be stored in `config.local.toml`, which is ignored by Git.
+
+Current configuration is limited to logging, runtime output paths, future capture
+settings, and future model-routing settings. Capture and model routing are disabled
+by default and are not implemented in the current phase.

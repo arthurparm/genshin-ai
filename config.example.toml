@@ -1,0 +1,21 @@
+[logging]
+log_dir = "logs"
+level = "INFO"
+
+[paths]
+runs_dir = "runs"
+captures_dir = "captures"
+replays_dir = "replays"
+artifacts_dir = "artifacts"
+
+[capture]
+enabled = false
+target_fps = 10
+process_width = 1280
+process_height = 720
+save_sample_frames = false
+
+[model_routing]
+enabled = false
+provider = "none"
+planner_model = "none"

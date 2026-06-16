@@ -17,5 +17,5 @@ def test_runtime_context_serializes_to_dict() -> None:
     payload = runtime.to_dict()
 
     assert payload["run_id"] == "test-run"
-    assert payload["project_phase"] == "FASE 0.1 - Structured Logging"
+    assert payload["project_phase"] == "FASE 0.2 - Typed Configuration"
     assert "started_at_utc" in payload

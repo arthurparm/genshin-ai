@@ -43,6 +43,30 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 0.2 - Typed Configuration
+
+Goal: establish typed, safe, testable configuration before capture, perception, execution, or
+planning modules.
+
+Tasks:
+
+- create typed immutable config dataclasses
+- load defaults when no config path is provided
+- load TOML overrides from an optional config file
+- reject unknown sections and keys
+- add config data to CLI sanity logs
+- add tests for defaults, overrides, and invalid config
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `python -m genshin_ai.cli` works with defaults
+- `python -m genshin_ai.cli --config config.example.toml` works
+- CLI logs include the config source and loaded config
+- no screen capture exists
+- no input automation exists
+- no LLM call exists
+
 ## FASE 1 - Capture and Observability
 
 Goal: capture frames and measure performance without acting on the game.
