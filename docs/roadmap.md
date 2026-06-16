@@ -117,6 +117,29 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.1 - Real Screen Capture Backend
+
+Goal: add an isolated real screen-capture backend for manual observability smoke tests.
+
+Tasks:
+
+- add optional `mss` capture dependency
+- isolate real capture behind CaptureSource
+- add screen-capture smoke command
+- save optional PPM frame samples
+- log real capture smoke events
+- keep unit tests independent from real monitors
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `python -m genshin_ai.cli capture-smoke` still works without `mss`
+- `python -m genshin_ai.cli screen-capture-smoke --frames 5` works when `mss` is installed
+- `--save-samples` writes PPM files under `runs/<run_id>/captures/`
+- no OCR exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction

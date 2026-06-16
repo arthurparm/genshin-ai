@@ -19,6 +19,9 @@ dev = [
     "ruff>=0.6.0",
     "mypy>=1.10.0",
 ]
+capture = [
+    "mss>=9.0.0",
+]
 
 [project.scripts]
 genshin-ai = "genshin_ai.cli:main"

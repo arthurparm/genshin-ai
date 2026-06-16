@@ -136,6 +136,19 @@ python -m genshin_ai.cli capture-smoke
 python -m genshin_ai.cli --config config.example.toml capture-smoke
 ```
 
+Install the optional real screen-capture backend:
+
+```powershell
+pip install -e ".[dev,capture]"
+```
+
+Run a bounded real screen-capture smoke test:
+
+```powershell
+python -m genshin_ai.cli screen-capture-smoke --frames 5
+python -m genshin_ai.cli screen-capture-smoke --frames 5 --save-samples
+```
+
 The CLI creates one run-scoped directory per execution:
 
 ```text
@@ -161,3 +174,7 @@ by default and are not implemented in the current phase.
 
 The `capture-smoke` command uses a mock capture source. It does not capture the real
 screen and does not interact with Genshin Impact.
+
+The `screen-capture-smoke` command uses the optional `mss` backend to capture the
+primary monitor. It is for manual observability testing only; it does not inspect
+game memory, automate input, or require Genshin Impact to be open.

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
 from genshin_ai.core.logging import JsonlEventLogger, JsonValue, LogEvent
 from genshin_ai.perception.capture import CaptureSource
+from genshin_ai.perception.frame import CapturedFrame
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ def run_capture_smoke_test(
     logger: JsonlEventLogger,
     frame_count: int = 5,
     target_fps: int = 10,
+    on_frame_captured: Callable[[CapturedFrame], None] | None = None,
 ) -> CaptureMetrics:
     """Run a bounded mock capture loop and emit structured events."""
     if frame_count < 0:
@@ -58,6 +61,8 @@ def run_capture_smoke_test(
         try:
             frame = source.capture_frame()
             frames_captured += 1
+            if on_frame_captured is not None:
+                on_frame_captured(frame)
             logger.emit(
                 LogEvent(
                     event="capture_frame_captured",
