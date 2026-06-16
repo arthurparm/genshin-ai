@@ -129,6 +129,13 @@ Run CLI sanity check with an explicit config file:
 python -m genshin_ai.cli --config config.example.toml
 ```
 
+Run a bounded mock capture smoke test:
+
+```powershell
+python -m genshin_ai.cli capture-smoke
+python -m genshin_ai.cli --config config.example.toml capture-smoke
+```
+
 The CLI creates one run-scoped directory per execution:
 
 ```text
@@ -151,3 +158,6 @@ should be stored in `config.local.toml`, which is ignored by Git.
 Current configuration is limited to logging, runtime output paths, future capture
 settings, and future model-routing settings. Capture and model routing are disabled
 by default and are not implemented in the current phase.
+
+The `capture-smoke` command uses a mock capture source. It does not capture the real
+screen and does not interact with Genshin Impact.

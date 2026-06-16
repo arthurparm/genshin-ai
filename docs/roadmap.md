@@ -93,6 +93,30 @@ Exit criteria:
 
 Goal: capture frames and measure performance without acting on the game.
 
+## FASE 1.0 - Capture Abstraction and Mock Metrics
+
+Goal: prove the capture loop contract with a mock source before adding real screen capture.
+
+Tasks:
+
+- define CapturedFrame
+- define CaptureSource
+- create MockCaptureSource
+- create CaptureMetrics
+- add bounded capture smoke test
+- emit capture smoke events to JSONL logs
+- add CLI command `capture-smoke`
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `python -m genshin_ai.cli capture-smoke` creates capture events
+- mock frame metadata includes source, frame id, dimensions, and timestamp
+- capture metrics include frames captured, target FPS, actual FPS, and failures
+- no real screen capture exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction
