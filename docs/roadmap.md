@@ -304,6 +304,37 @@ Exit criteria:
 
 Goal: extract basic information from frames.
 
+## FASE 2.0 - ROI Extraction and Perception Observation Contracts
+
+Goal: create a minimal structural perception layer that extracts explicit RGB
+regions from processed replay frames before OCR or semantic vision exists.
+
+Tasks:
+
+- define immutable `RegionSpec`
+- define immutable `RegionFrame`
+- validate ROI coordinates and RGB frame contracts
+- extract ROI bytes from processed `RGB` frames
+- save ROI samples as PPM files
+- add `roi-smoke` CLI command backed by processed-frame replay
+- emit ROI events with source `frame_path` for auditability
+- keep unit tests independent from real screen capture
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `ruff check .` passes
+- `mypy src tests` passes
+- `roi-smoke --frames-dir <dir> --x 0 --y 0 --width 1 --height 1 --name test --limit 1`
+  works with valid processed PPM input
+- ROI samples can be saved under `runs/<run_id>/artifacts/roi/`
+- ROI outside frame bounds fails with a clear error
+- `roi_extracted` events include region metadata, `source_frame_id`, and `frame_path`
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - detect screen mode

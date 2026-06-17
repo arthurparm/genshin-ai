@@ -52,10 +52,11 @@ Logs / Replay / Evaluation
 
 ## Current Phase
 
-FASE 0 - Foundation
+FASE 2.0 - ROI Extraction and Perception Observation Contracts
 
-The current goal is to create a clean, testable, versioned project foundation before
-adding screen capture, OCR, vision models, LLM calls, or execution modules.
+The current goal is to create a minimal structural perception layer that extracts
+explicit RGB regions from processed replay frames before adding OCR, semantic
+vision, LLM calls, or execution modules.
 
 ## Hardware Target
 
@@ -173,6 +174,13 @@ python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures
 python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures --limit 5
 ```
 
+Run a region-of-interest smoke test from processed PPM replay frames:
+
+```powershell
+python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1
+python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1 --save-samples
+```
+
 The CLI creates one run-scoped directory per execution:
 
 ```text
@@ -232,9 +240,19 @@ the screen, perform OCR, run semantic vision, automate input, or call models.
 Each `replay_frame_loaded` event includes frame metadata and `frame_path` for
 auditability.
 
+The `roi-smoke` command reads the same processed PPM replay input and extracts a
+bounded RGB region by explicit pixel coordinates. It emits `roi_smoke_started`,
+`roi_extracted`, optional `roi_sample_saved`, and `roi_smoke_finished` events.
+Each `roi_extracted` event includes region metadata, `source_frame_id`, and
+`frame_path`. Saved ROI samples are written as PPM files under
+`runs/<run_id>/artifacts/roi/`. This command only prepares structural perception
+input for future OCR, HUD parsing, minimap parsing, and evaluation; it does not
+interpret image content.
+
 A typical manual replay flow is:
 
 ```powershell
 python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --preprocess-backend pillow --save-samples
 python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures --limit 5
+python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1 --save-samples
 ```

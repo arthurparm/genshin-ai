@@ -20,6 +20,12 @@ from genshin_ai.perception.preprocess import (
     processed_frame_sample_path,
     save_processed_frame_sample_ppm,
 )
+from genshin_ai.perception.regions import (
+    RegionExtractionError,
+    RegionSpec,
+    extract_region,
+    save_region_sample_ppm,
+)
 from genshin_ai.perception.replay import (
     ProcessedFrameReplaySource,
     ReplayEndOfSequenceError,
@@ -81,6 +87,17 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "replay-smoke":
         _run_replay_smoke_command(
+            args,
+            config,
+            config_source,
+            runtime,
+            session,
+            event_logger,
+        )
+        return
+
+    if args.command == "roi-smoke":
+        _run_roi_smoke_command(
             args,
             config,
             config_source,
@@ -441,6 +458,138 @@ def _run_replay_smoke_command(
     print(f"Frames loaded: {frames_loaded}")
 
 
+def _run_roi_smoke_command(
+    args: argparse.Namespace,
+    config: AppConfig,
+    config_source: str,
+    runtime: RuntimeContext,
+    session: RunSession,
+    event_logger: JsonlEventLogger,
+) -> None:
+    if args.limit <= 0:
+        raise SystemExit("ROI smoke frame limit must be positive.")
+
+    try:
+        region = RegionSpec(
+            name=args.name,
+            x=args.x,
+            y=args.y,
+            width=args.width,
+            height=args.height,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    event_logger.emit(
+        LogEvent(
+            event="roi_smoke_started",
+            module="perception.regions",
+            data={
+                "frames_dir": str(args.frames_dir),
+                "limit": args.limit,
+                "save_samples": args.save_samples,
+                "region": region_metadata(region),
+                "config_source": config_source,
+                "config": config.to_dict(),
+            },
+        )
+    )
+
+    frames_loaded = 0
+    samples_saved = 0
+    try:
+        source = ProcessedFrameReplaySource(args.frames_dir)
+        while frames_loaded < args.limit:
+            try:
+                loaded = source.load_next()
+            except ReplayEndOfSequenceError:
+                if frames_loaded > 0:
+                    break
+                raise
+
+            region_frame = extract_region(loaded.frame, region)
+            frames_loaded += 1
+
+            event_data = dict[str, JsonValue](region_frame.metadata())
+            event_data["source_frame_id"] = loaded.frame.frame_id
+            event_data["frame_path"] = str(loaded.path)
+            event_logger.emit(
+                LogEvent(
+                    event="roi_extracted",
+                    module="perception.regions",
+                    data=event_data,
+                )
+            )
+
+            if args.save_samples:
+                output_path = save_region_sample_ppm(
+                    region_frame,
+                    session.artifacts_dir
+                    / "roi"
+                    / f"{region_frame.region_name}_{region_frame.frame_id:06d}.ppm",
+                )
+                samples_saved += 1
+                event_logger.emit(
+                    LogEvent(
+                        event="roi_sample_saved",
+                        module="perception.regions",
+                        data={
+                            **dict[str, JsonValue](region_frame.metadata()),
+                            "path": str(output_path),
+                            "frame_path": str(loaded.path),
+                        },
+                    )
+                )
+    except (ReplayFrameError, RegionExtractionError) as error:
+        event_logger.emit(
+            LogEvent(
+                event="roi_smoke_failed",
+                module="perception.regions",
+                level="ERROR",
+                message=str(error),
+            )
+        )
+        raise SystemExit(str(error)) from error
+
+    event_logger.emit(
+        LogEvent(
+            event="roi_smoke_finished",
+            module="perception.regions",
+            data={
+                "frames_dir": str(args.frames_dir),
+                "limit": args.limit,
+                "frames_loaded": frames_loaded,
+                "samples_saved": samples_saved,
+            },
+        )
+    )
+
+    print(f"genshin-ai {__version__}")
+    print(f"Run ID: {runtime.run_id}")
+    print(f"Phase: {runtime.project_phase}")
+    print(f"Config: {config_source}")
+    print(f"Run session: {session.root_dir}")
+    print(f"Replay frames dir: {args.frames_dir}")
+    print(
+        f"ROI: {region.name} x={region.x} y={region.y} "
+        f"width={region.width} height={region.height}"
+    )
+    print(f"Replay limit: {args.limit}")
+    print(f"Frames loaded: {frames_loaded}")
+    print(f"Samples saved: {samples_saved}")
+
+
+def region_metadata(region: RegionSpec) -> dict[str, str | int]:
+    """Return JSON-compatible region spec metadata."""
+    return {
+        "name": region.name,
+        "x": region.x,
+        "y": region.y,
+        "width": region.width,
+        "height": region.height,
+    }
+
+
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Genshin AI research agent CLI.")
     parser.add_argument(
@@ -542,6 +691,62 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Maximum number of replay frames to load.",
     )
     replay_smoke_parser.add_argument(
+        "--config",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help="Optional TOML configuration file path.",
+    )
+    roi_smoke_parser = subparsers.add_parser(
+        "roi-smoke",
+        help="Extract an RGB region from processed PPM replay frames.",
+    )
+    roi_smoke_parser.add_argument(
+        "--frames-dir",
+        type=Path,
+        required=True,
+        help="Directory containing processed .ppm replay frames.",
+    )
+    roi_smoke_parser.add_argument(
+        "--x",
+        type=int,
+        required=True,
+        help="Region left coordinate in processed-frame pixels.",
+    )
+    roi_smoke_parser.add_argument(
+        "--y",
+        type=int,
+        required=True,
+        help="Region top coordinate in processed-frame pixels.",
+    )
+    roi_smoke_parser.add_argument(
+        "--width",
+        type=int,
+        required=True,
+        help="Region width in processed-frame pixels.",
+    )
+    roi_smoke_parser.add_argument(
+        "--height",
+        type=int,
+        required=True,
+        help="Region height in processed-frame pixels.",
+    )
+    roi_smoke_parser.add_argument(
+        "--name",
+        required=True,
+        help="Stable region name for logs and optional samples.",
+    )
+    roi_smoke_parser.add_argument(
+        "--limit",
+        type=int,
+        default=1,
+        help="Maximum number of replay frames to process.",
+    )
+    roi_smoke_parser.add_argument(
+        "--save-samples",
+        action="store_true",
+        help="Save extracted ROI samples as PPM files.",
+    )
+    roi_smoke_parser.add_argument(
         "--config",
         type=Path,
         default=argparse.SUPPRESS,
