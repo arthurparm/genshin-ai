@@ -234,6 +234,29 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.6 - Processed Frame Replay Source
+
+Goal: replay processed RGB frames from saved PPM files before adding OCR or semantic vision.
+
+Tasks:
+
+- add a replay source for processed binary PPM frames
+- parse PPM P6 headers and RGB payloads with explicit validation
+- add a `replay-smoke` CLI command
+- emit replay start, frame-loaded, and finish events
+- keep tests independent from real screen capture
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `replay-smoke --frames-dir <dir>` loads valid processed PPM frames
+- replay frames are deterministic and ordered by filename
+- invalid replay inputs fail with clear errors
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction

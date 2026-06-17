@@ -20,6 +20,7 @@ from genshin_ai.perception.preprocess import (
     processed_frame_sample_path,
     save_processed_frame_sample_ppm,
 )
+from genshin_ai.perception.replay import ProcessedFrameReplaySource, ReplayFrameError
 from genshin_ai.perception.screen_capture import (
     MssScreenCaptureSource,
     ScreenCaptureDependencyError,
@@ -65,6 +66,17 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "capture-benchmark":
         _run_capture_benchmark_command(
+            args,
+            config,
+            config_source,
+            runtime,
+            session,
+            event_logger,
+        )
+        return
+
+    if args.command == "replay-smoke":
+        _run_replay_smoke_command(
             args,
             config,
             config_source,
@@ -347,6 +359,82 @@ def _run_capture_benchmark_command(
     print(f"Report: {report_path}")
 
 
+def _run_replay_smoke_command(
+    args: argparse.Namespace,
+    config: AppConfig,
+    config_source: str,
+    runtime: RuntimeContext,
+    session: RunSession,
+    event_logger: JsonlEventLogger,
+) -> None:
+    if args.limit <= 0:
+        raise SystemExit("Replay frame limit must be positive.")
+
+    event_logger.emit(
+        LogEvent(
+            event="replay_smoke_started",
+            module="perception.replay",
+            data={
+                "frames_dir": str(args.frames_dir),
+                "limit": args.limit,
+                "config_source": config_source,
+                "config": config.to_dict(),
+            },
+        )
+    )
+
+    try:
+        source = ProcessedFrameReplaySource(args.frames_dir)
+        frames_loaded = 0
+        while frames_loaded < args.limit:
+            try:
+                frame = source.load_next_frame()
+            except ReplayFrameError as error:
+                if frames_loaded > 0 and str(error) == "No more replay frames are available.":
+                    break
+                raise
+
+            frames_loaded += 1
+            event_logger.emit(
+                LogEvent(
+                    event="replay_frame_loaded",
+                    module="perception.replay",
+                    data=dict[str, JsonValue](frame.metadata()),
+                )
+            )
+    except ReplayFrameError as error:
+        event_logger.emit(
+            LogEvent(
+                event="replay_smoke_failed",
+                module="perception.replay",
+                level="ERROR",
+                message=str(error),
+            )
+        )
+        raise SystemExit(str(error)) from error
+
+    event_logger.emit(
+        LogEvent(
+            event="replay_smoke_finished",
+            module="perception.replay",
+            data={
+                "frames_dir": str(args.frames_dir),
+                "limit": args.limit,
+                "frames_loaded": frames_loaded,
+            },
+        )
+    )
+
+    print(f"genshin-ai {__version__}")
+    print(f"Run ID: {runtime.run_id}")
+    print(f"Phase: {runtime.project_phase}")
+    print(f"Config: {config_source}")
+    print(f"Run session: {session.root_dir}")
+    print(f"Replay frames dir: {args.frames_dir}")
+    print(f"Replay limit: {args.limit}")
+    print(f"Frames loaded: {frames_loaded}")
+
+
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Genshin AI research agent CLI.")
     parser.add_argument(
@@ -426,6 +514,28 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Save one sample every N attempted frames.",
     )
     capture_benchmark_parser.add_argument(
+        "--config",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help="Optional TOML configuration file path.",
+    )
+    replay_smoke_parser = subparsers.add_parser(
+        "replay-smoke",
+        help="Load processed PPM replay frames without screen capture.",
+    )
+    replay_smoke_parser.add_argument(
+        "--frames-dir",
+        type=Path,
+        required=True,
+        help="Directory containing processed .ppm replay frames.",
+    )
+    replay_smoke_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Maximum number of replay frames to load.",
+    )
+    replay_smoke_parser.add_argument(
         "--config",
         type=Path,
         default=argparse.SUPPRESS,

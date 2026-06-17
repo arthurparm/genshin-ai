@@ -166,6 +166,13 @@ python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess --save-every
 python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess --preprocess-backend pillow
 ```
 
+Run a replay smoke test from processed PPM frames:
+
+```powershell
+python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures
+python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures --limit 5
+```
+
 The CLI creates one run-scoped directory per execution:
 
 ```text
@@ -217,3 +224,15 @@ sample counts. When preprocessing is enabled, the report also records the
 `preprocess_backend` used for the run. Use `average_capture_ms`,
 `average_total_frame_ms`, and `actual_fps` to compare capture backend changes
 before and after optimization commits.
+
+The `replay-smoke` command reads processed binary PPM (`P6`) frames from a
+directory and returns deterministic RGB `ProcessedFrame` objects for future
+perception tests. It emits replay events to the run JSONL log and does not capture
+the screen, perform OCR, run semantic vision, automate input, or call models.
+
+A typical manual replay flow is:
+
+```powershell
+python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --preprocess-backend pillow --save-samples
+python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures --limit 5
+```
