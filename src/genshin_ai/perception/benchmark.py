@@ -13,7 +13,7 @@ from genshin_ai.core.session import RunSession
 from genshin_ai.perception.capture import CaptureSource
 from genshin_ai.perception.frame import CapturedFrame, ProcessedFrame
 from genshin_ai.perception.preprocess import (
-    preprocess_bgra_frame,
+    preprocess_frame,
     processed_frame_sample_path,
     save_processed_frame_sample_ppm,
 )
@@ -32,6 +32,7 @@ class CaptureBenchmarkReport:
     frames_captured: int
     failed_frames: int
     preprocess_enabled: bool
+    preprocess_backend: str | None
     source_width: int | None
     source_height: int | None
     process_width: int | None
@@ -69,6 +70,7 @@ def run_capture_benchmark(
     logger: JsonlEventLogger,
     frames: int,
     preprocess: bool,
+    preprocess_backend: str,
     process_width: int,
     process_height: int,
     save_every: int | None,
@@ -86,6 +88,7 @@ def run_capture_benchmark(
             data={
                 "frames": frames,
                 "preprocess": preprocess,
+                "preprocess_backend": preprocess_backend if preprocess else None,
                 "process_width": process_width,
                 "process_height": process_height,
                 "save_every": save_every,
@@ -123,10 +126,11 @@ def run_capture_benchmark(
 
             if preprocess:
                 preprocess_started = time.perf_counter()
-                processed_frame = preprocess_bgra_frame(
+                processed_frame = preprocess_frame(
                     frame,
                     target_width=process_width,
                     target_height=process_height,
+                    backend=preprocess_backend,
                 )
                 preprocess_ms = _elapsed_ms(preprocess_started)
                 preprocess_durations_ms.append(preprocess_ms)
@@ -153,6 +157,7 @@ def run_capture_benchmark(
                             "frame_index": frame_index,
                             "path": str(output_path),
                             "preprocess": preprocess,
+                            "preprocess_backend": preprocess_backend if preprocess else None,
                         },
                     )
                 )
@@ -172,6 +177,7 @@ def run_capture_benchmark(
                     "frame_index": frame_index,
                     "captured": frame is not None,
                     "preprocessed": processed_frame is not None,
+                    "preprocess_backend": preprocess_backend if preprocess else None,
                     "capture_ms": capture_ms,
                     "preprocess_ms": preprocess_ms,
                     "total_frame_ms": total_frame_ms,
@@ -186,6 +192,7 @@ def run_capture_benchmark(
         frames_captured=frames_captured,
         failed_frames=failed_frames,
         preprocess_enabled=preprocess,
+        preprocess_backend=preprocess_backend if preprocess else None,
         source_width=source_width,
         source_height=source_height,
         process_width=process_width if preprocess else None,

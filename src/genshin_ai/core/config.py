@@ -45,6 +45,7 @@ class CaptureConfig:
     target_fps: int = 10
     process_width: int = 1280
     process_height: int = 720
+    preprocess_backend: str = "python"
     save_sample_frames: bool = False
 
     def to_dict(self) -> dict[str, object]:

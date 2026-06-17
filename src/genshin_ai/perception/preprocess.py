@@ -2,13 +2,41 @@
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
+from typing import Any, cast
 
 from genshin_ai.perception.frame import CapturedFrame, ProcessedFrame
 
 
 class FramePreprocessingError(RuntimeError):
     """Raised when a captured frame cannot be preprocessed."""
+
+
+class FramePreprocessorDependencyError(RuntimeError):
+    """Raised when an optional preprocessing backend dependency is missing."""
+
+
+def preprocess_frame(
+    frame: CapturedFrame,
+    target_width: int,
+    target_height: int,
+    backend: str = "python",
+) -> ProcessedFrame:
+    """Preprocess a captured BGRA frame using the selected backend."""
+    if backend == "python":
+        return preprocess_bgra_frame(
+            frame,
+            target_width=target_width,
+            target_height=target_height,
+        )
+    if backend == "pillow":
+        return _preprocess_bgra_frame_with_pillow(
+            frame,
+            target_width=target_width,
+            target_height=target_height,
+        )
+    raise ValueError(f"Unknown preprocessing backend: {backend}")
 
 
 def preprocess_bgra_frame(
@@ -39,6 +67,51 @@ def preprocess_bgra_frame(
         source_frame_height=frame.height,
         source=f"{frame.source}.preprocess",
         data=rgb_data,
+    )
+
+
+def _preprocess_bgra_frame_with_pillow(
+    frame: CapturedFrame,
+    target_width: int,
+    target_height: int,
+) -> ProcessedFrame:
+    _validate_target_size(target_width, target_height)
+    _validate_bgra_frame(frame)
+
+    if frame.data is None:
+        raise FramePreprocessingError("Cannot preprocess frame because frame.data is None.")
+
+    try:
+        image_module = importlib.import_module("PIL.Image")
+    except ModuleNotFoundError as error:
+        raise FramePreprocessorDependencyError(
+            "Pillow is required for preprocess backend 'pillow'. "
+            "Install it with: pip install -e \".[image]\""
+        ) from error
+
+    image_api = cast(Any, image_module)
+    resampling = getattr(image_api, "Resampling", image_api)
+    image = image_api.frombytes(
+        "RGBA",
+        (frame.width, frame.height),
+        frame.data,
+        "raw",
+        "BGRA",
+    )
+    resized = image.convert("RGB").resize(
+        (target_width, target_height),
+        resample=resampling.NEAREST,
+    )
+
+    return ProcessedFrame(
+        frame_id=frame.frame_id,
+        width=target_width,
+        height=target_height,
+        source_frame_width=frame.width,
+        source_frame_height=frame.height,
+        source=f"{frame.source}.preprocess",
+        data=resized.tobytes(),
+        pixel_format="RGB",
     )
 
 

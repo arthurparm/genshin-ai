@@ -142,12 +142,19 @@ Install the optional real screen-capture backend:
 pip install -e ".[dev,capture]"
 ```
 
+Install the optional optimized image preprocessing backend:
+
+```powershell
+pip install -e ".[dev,capture,image]"
+```
+
 Run a bounded real screen-capture smoke test:
 
 ```powershell
 python -m genshin_ai.cli screen-capture-smoke --frames 5
 python -m genshin_ai.cli screen-capture-smoke --frames 5 --save-samples
 python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --save-samples
+python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --preprocess-backend pillow
 ```
 
 Run an operational capture benchmark:
@@ -156,6 +163,7 @@ Run an operational capture benchmark:
 python -m genshin_ai.cli capture-benchmark --frames 30
 python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess
 python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess --save-every 10
+python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess --preprocess-backend pillow
 ```
 
 The CLI creates one run-scoped directory per execution:
@@ -193,6 +201,12 @@ resized to `capture.process_width` x `capture.process_height` from the loaded
 configuration. Processed samples are written as PPM files under the run captures
 directory when `--save-samples` is also enabled.
 
+The default preprocessing backend is `python`, which has no optional image
+dependency. The optional `pillow` backend requires the `image` extra and is intended
+for benchmarked preprocessing performance comparisons before OCR or semantic vision
+is added.
+
 The `capture-benchmark` command writes `capture_benchmark.json` under the run
 artifacts directory with FPS, capture latency, preprocessing latency, failures, and
-sample counts.
+sample counts. When preprocessing is enabled, the report also records the
+`preprocess_backend` used for the run.

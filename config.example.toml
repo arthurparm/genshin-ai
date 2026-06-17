@@ -13,6 +13,7 @@ enabled = false
 target_fps = 10
 process_width = 1280
 process_height = 720
+preprocess_backend = "python"
 save_sample_frames = false
 
 [model_routing]

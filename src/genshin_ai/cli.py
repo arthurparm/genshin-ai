@@ -16,7 +16,7 @@ from genshin_ai.perception.capture import MockCaptureSource
 from genshin_ai.perception.frame import CapturedFrame
 from genshin_ai.perception.metrics import run_capture_smoke_test
 from genshin_ai.perception.preprocess import (
-    preprocess_bgra_frame,
+    preprocess_frame,
     processed_frame_sample_path,
     save_processed_frame_sample_ppm,
 )
@@ -146,6 +146,7 @@ def _run_screen_capture_smoke_command(
     session: RunSession,
     event_logger: JsonlEventLogger,
 ) -> None:
+    preprocess_backend = args.preprocess_backend or config.capture.preprocess_backend
     event_logger.emit(
         LogEvent(
             event="screen_capture_smoke_started",
@@ -153,6 +154,7 @@ def _run_screen_capture_smoke_command(
             data={
                 "frames": args.frames,
                 "preprocess": args.preprocess,
+                "preprocess_backend": preprocess_backend if args.preprocess else None,
                 "save_samples": args.save_samples,
                 "config_source": config_source,
             },
@@ -177,16 +179,20 @@ def _run_screen_capture_smoke_command(
     def save_sample(frame: CapturedFrame) -> None:
         nonlocal saved_samples
         if args.preprocess:
-            processed_frame = preprocess_bgra_frame(
+            processed_frame = preprocess_frame(
                 frame,
                 target_width=config.capture.process_width,
                 target_height=config.capture.process_height,
+                backend=preprocess_backend,
             )
             event_logger.emit(
                 LogEvent(
                     event="frame_preprocessed",
                     module="perception.preprocess",
-                    data=dict[str, JsonValue](processed_frame.metadata()),
+                    data={
+                        **dict[str, JsonValue](processed_frame.metadata()),
+                        "preprocess_backend": preprocess_backend,
+                    },
                 )
             )
             output_path = save_processed_frame_sample_ppm(
@@ -214,21 +220,26 @@ def _run_screen_capture_smoke_command(
                     "width": width,
                     "height": height,
                     "preprocessed": args.preprocess,
+                    "preprocess_backend": preprocess_backend if args.preprocess else None,
                 },
             )
         )
 
     def preprocess_only(frame: CapturedFrame) -> None:
-        processed_frame = preprocess_bgra_frame(
+        processed_frame = preprocess_frame(
             frame,
             target_width=config.capture.process_width,
             target_height=config.capture.process_height,
+            backend=preprocess_backend,
         )
         event_logger.emit(
             LogEvent(
                 event="frame_preprocessed",
                 module="perception.preprocess",
-                data=dict[str, JsonValue](processed_frame.metadata()),
+                data={
+                    **dict[str, JsonValue](processed_frame.metadata()),
+                    "preprocess_backend": preprocess_backend,
+                },
             )
         )
 
@@ -253,6 +264,7 @@ def _run_screen_capture_smoke_command(
             data={
                 "frames": args.frames,
                 "preprocess": args.preprocess,
+                "preprocess_backend": preprocess_backend if args.preprocess else None,
                 "saved_samples": saved_samples,
                 "metrics": metrics.to_dict(),
             },
@@ -270,6 +282,8 @@ def _run_screen_capture_smoke_command(
     print(f"Actual FPS: {metrics.actual_fps:.2f}")
     print(f"Failed frames: {metrics.failed_frames}")
     print(f"Preprocess: {args.preprocess}")
+    if args.preprocess:
+        print(f"Preprocess backend: {preprocess_backend}")
     print(f"Samples saved: {saved_samples}")
 
 
@@ -281,6 +295,7 @@ def _run_capture_benchmark_command(
     session: RunSession,
     event_logger: JsonlEventLogger,
 ) -> None:
+    preprocess_backend = args.preprocess_backend or config.capture.preprocess_backend
     try:
         source = MssScreenCaptureSource()
     except ScreenCaptureDependencyError as error:
@@ -301,6 +316,7 @@ def _run_capture_benchmark_command(
         logger=event_logger,
         frames=args.frames,
         preprocess=args.preprocess,
+        preprocess_backend=preprocess_backend,
         process_width=config.capture.process_width,
         process_height=config.capture.process_height,
         save_every=args.save_every,
@@ -320,6 +336,7 @@ def _run_capture_benchmark_command(
     print(f"Frames captured: {report.frames_captured}")
     print(f"Failed frames: {report.failed_frames}")
     print(f"Preprocess: {report.preprocess_enabled}")
+    print(f"Preprocess backend: {report.preprocess_backend}")
     print(f"Actual FPS: {report.actual_fps:.2f}")
     print(f"Average capture ms: {report.average_capture_ms:.2f}")
     print(f"Average preprocess ms: {report.average_preprocess_ms:.2f}")
@@ -368,6 +385,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Preprocess captured frames to configured RGB resolution.",
     )
     screen_capture_smoke_parser.add_argument(
+        "--preprocess-backend",
+        choices=("python", "pillow"),
+        default=None,
+        help="Preprocessing backend to use when --preprocess is enabled.",
+    )
+    screen_capture_smoke_parser.add_argument(
         "--config",
         type=Path,
         default=argparse.SUPPRESS,
@@ -387,6 +410,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--preprocess",
         action="store_true",
         help="Benchmark preprocessing to configured RGB resolution.",
+    )
+    capture_benchmark_parser.add_argument(
+        "--preprocess-backend",
+        choices=("python", "pillow"),
+        default=None,
+        help="Preprocessing backend to use when --preprocess is enabled.",
     )
     capture_benchmark_parser.add_argument(
         "--save-every",

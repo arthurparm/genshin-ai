@@ -190,6 +190,29 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.4 - Optional Optimized Preprocessing Backend
+
+Goal: add an optional optimized BGRA-to-RGB resize backend before OCR or semantic vision.
+
+Tasks:
+
+- add optional Pillow dependency under the `image` extra
+- keep the Python preprocessing backend as the default
+- add backend selection to config, smoke tests, and benchmark CLI
+- record the preprocessing backend in logs and benchmark reports
+- keep unit tests independent from real monitors and optional Pillow availability
+
+Exit criteria:
+
+- `python -m pytest` passes without installing the `image` extra
+- `capture-benchmark --frames 30 --preprocess` works with backend `python`
+- `capture-benchmark --frames 30 --preprocess --preprocess-backend pillow` works when Pillow is installed
+- `capture_benchmark.json` includes `preprocess_backend`
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction

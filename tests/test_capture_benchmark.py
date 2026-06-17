@@ -48,6 +48,7 @@ def test_capture_benchmark_report_serializes_to_dict() -> None:
         frames_captured=3,
         failed_frames=0,
         preprocess_enabled=False,
+        preprocess_backend=None,
         source_width=1280,
         source_height=720,
         process_width=None,
@@ -65,6 +66,8 @@ def test_capture_benchmark_report_serializes_to_dict() -> None:
     assert payload["run_id"] == "test-run"
     assert payload["frames_captured"] == 3
     assert payload["actual_fps"] == 3.0
+    assert "preprocess_backend" in payload
+    assert payload["preprocess_backend"] is None
 
 
 def test_save_capture_benchmark_report_writes_json(tmp_path: Path) -> None:
@@ -74,6 +77,7 @@ def test_save_capture_benchmark_report_writes_json(tmp_path: Path) -> None:
         frames_captured=1,
         failed_frames=0,
         preprocess_enabled=False,
+        preprocess_backend=None,
         source_width=2,
         source_height=1,
         process_width=None,
@@ -103,6 +107,7 @@ def test_run_capture_benchmark_without_preprocess(tmp_path: Path) -> None:
         logger=logger,
         frames=3,
         preprocess=False,
+        preprocess_backend="python",
         process_width=640,
         process_height=360,
         save_every=None,
@@ -113,6 +118,7 @@ def test_run_capture_benchmark_without_preprocess(tmp_path: Path) -> None:
     assert report.frames_captured == 3
     assert report.failed_frames == 0
     assert report.actual_fps > 0
+    assert report.preprocess_backend is None
     assert report.process_width is None
     assert report.process_height is None
 
@@ -127,6 +133,7 @@ def test_run_capture_benchmark_with_preprocess(tmp_path: Path) -> None:
         logger=logger,
         frames=2,
         preprocess=True,
+        preprocess_backend="python",
         process_width=1,
         process_height=1,
         save_every=None,
@@ -135,6 +142,7 @@ def test_run_capture_benchmark_with_preprocess(tmp_path: Path) -> None:
     assert report.frames_captured == 2
     assert report.failed_frames == 0
     assert report.preprocess_enabled is True
+    assert report.preprocess_backend == "python"
     assert report.source_width == 2
     assert report.source_height == 1
     assert report.process_width == 1
@@ -153,6 +161,7 @@ def test_run_capture_benchmark_rejects_invalid_arguments(tmp_path: Path) -> None
             logger=logger,
             frames=0,
             preprocess=False,
+            preprocess_backend="python",
             process_width=1,
             process_height=1,
             save_every=None,
@@ -166,6 +175,7 @@ def test_run_capture_benchmark_rejects_invalid_arguments(tmp_path: Path) -> None
             logger=logger,
             frames=1,
             preprocess=False,
+            preprocess_backend="python",
             process_width=1,
             process_height=1,
             save_every=0,
@@ -182,6 +192,7 @@ def test_run_capture_benchmark_writes_events(tmp_path: Path) -> None:
         logger=logger,
         frames=1,
         preprocess=False,
+        preprocess_backend="python",
         process_width=640,
         process_height=360,
         save_every=None,
@@ -195,6 +206,33 @@ def test_run_capture_benchmark_writes_events(tmp_path: Path) -> None:
 
     assert "capture_benchmark_started" in event_names
     assert "capture_benchmark_finished" in event_names
+    assert events[0]["data"]["preprocess_backend"] is None
+
+
+def test_run_capture_benchmark_logs_preprocess_backend(tmp_path: Path) -> None:
+    runtime, session, logger = _benchmark_context(tmp_path)
+
+    run_capture_benchmark(
+        source=BgraCaptureSource(),
+        runtime=runtime,
+        session=session,
+        logger=logger,
+        frames=1,
+        preprocess=True,
+        preprocess_backend="python",
+        process_width=1,
+        process_height=1,
+        save_every=None,
+    )
+
+    events = [
+        json.loads(line)
+        for line in (session.logs_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert events[0]["data"]["preprocess_backend"] == "python"
+    assert events[1]["data"]["preprocess_backend"] == "python"
+    assert events[-1]["data"]["preprocess_backend"] == "python"
 
 
 def test_run_capture_benchmark_saves_samples(tmp_path: Path) -> None:
@@ -207,6 +245,7 @@ def test_run_capture_benchmark_saves_samples(tmp_path: Path) -> None:
         logger=logger,
         frames=2,
         preprocess=True,
+        preprocess_backend="python",
         process_width=1,
         process_height=1,
         save_every=1,

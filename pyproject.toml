@@ -22,6 +22,9 @@ dev = [
 capture = [
     "mss>=9.0.0",
 ]
+image = [
+    "Pillow>=10.0.0",
+]
 
 [project.scripts]
 genshin-ai = "genshin_ai.cli:main"

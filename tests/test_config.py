@@ -26,6 +26,7 @@ def test_capture_config_defaults_are_safe() -> None:
     assert capture.target_fps == 10
     assert capture.process_width == 1280
     assert capture.process_height == 720
+    assert capture.preprocess_backend == "python"
     assert capture.save_sample_frames is False
 
 
@@ -48,6 +49,7 @@ enabled = true
 target_fps = 15
 process_width = 960
 process_height = 540
+preprocess_backend = "pillow"
 save_sample_frames = true
 
 [model_routing]
@@ -66,6 +68,7 @@ planner_model = "planner-test"
     assert config.capture.target_fps == 15
     assert config.capture.process_width == 960
     assert config.capture.process_height == 540
+    assert config.capture.preprocess_backend == "pillow"
     assert config.capture.save_sample_frames is True
     assert config.model_routing.enabled is True
     assert config.model_routing.provider == "omnirouter"
@@ -88,6 +91,7 @@ target_fps = 20
     assert config.capture.target_fps == 20
     assert config.capture.process_width == 1280
     assert config.capture.process_height == 720
+    assert config.capture.preprocess_backend == "python"
     assert config.capture.save_sample_frames is False
     assert config.logging.log_dir == "logs"
 
@@ -136,5 +140,6 @@ def test_config_serializes_to_dict() -> None:
         "target_fps": 10,
         "process_width": 1280,
         "process_height": 720,
+        "preprocess_backend": "python",
         "save_sample_frames": False,
     }
