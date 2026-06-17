@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from genshin_ai.perception.frame import ProcessedFrame
@@ -9,6 +10,18 @@ from genshin_ai.perception.frame import ProcessedFrame
 
 class ReplayFrameError(RuntimeError):
     """Raised when replay frames cannot be loaded or parsed."""
+
+
+class ReplayEndOfSequenceError(ReplayFrameError):
+    """Raised when a replay source has no more frames to load."""
+
+
+@dataclass(frozen=True)
+class ReplayLoadedFrame:
+    """A replay frame loaded with its source path for auditability."""
+
+    frame: ProcessedFrame
+    path: Path
 
 
 class ProcessedFrameReplaySource:
@@ -30,30 +43,42 @@ class ProcessedFrameReplaySource:
 
     def load_next_frame(self) -> ProcessedFrame:
         """Load the next replay frame from disk."""
+        return self.load_next().frame
+
+    def load_next(self) -> ReplayLoadedFrame:
+        """Load the next replay frame and return its source path."""
         if self._next_index >= len(self._frame_paths):
-            raise ReplayFrameError("No more replay frames are available.")
+            raise ReplayEndOfSequenceError("No more replay frames are available.")
 
         path = self._frame_paths[self._next_index]
-        self._next_index += 1
-
         width, height, payload = _read_ppm_p6(path)
+
         frame_id = self._next_frame_id
+
+        self._next_index += 1
         self._next_frame_id += 1
 
-        return ProcessedFrame(
-            frame_id=frame_id,
-            width=width,
-            height=height,
-            source_frame_width=width,
-            source_frame_height=height,
-            source=self.source,
-            pixel_format="RGB",
-            data=payload,
+        return ReplayLoadedFrame(
+            frame=ProcessedFrame(
+                frame_id=frame_id,
+                width=width,
+                height=height,
+                source_frame_width=width,
+                source_frame_height=height,
+                source=self.source,
+                pixel_format="RGB",
+                data=payload,
+            ),
+            path=path,
         )
 
 
 def _read_ppm_p6(path: Path) -> tuple[int, int, bytes]:
-    data = path.read_bytes()
+    try:
+        data = path.read_bytes()
+    except OSError as error:
+        raise ReplayFrameError(f"Failed to read replay frame file {path}: {error}") from error
+
     cursor = 0
 
     magic, cursor = _read_ascii_token(data, cursor, path)

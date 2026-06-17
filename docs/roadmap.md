@@ -257,6 +257,33 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.7 - Replay Auditability Hardening
+
+Goal: harden processed-frame replay before using it as a regression input for OCR,
+HUD parsing, or visual perception.
+
+Tasks:
+
+- make replay frame loading transactional when PPM parsing fails
+- expose the loaded frame path with the replay frame result
+- use a typed end-of-sequence error instead of message matching
+- include `frame_path` in `replay_frame_loaded` events
+- normalize replay frame file read failures as `ReplayFrameError`
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `ruff check .` passes
+- `mypy src tests` passes
+- invalid replay frames do not advance the replay sequence
+- replay end-of-sequence is represented by `ReplayEndOfSequenceError`
+- `replay_frame_loaded` events include `frame_path`
+- file read failures are wrapped as `ReplayFrameError`
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction

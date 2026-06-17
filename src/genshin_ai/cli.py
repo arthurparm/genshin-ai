@@ -20,7 +20,11 @@ from genshin_ai.perception.preprocess import (
     processed_frame_sample_path,
     save_processed_frame_sample_ppm,
 )
-from genshin_ai.perception.replay import ProcessedFrameReplaySource, ReplayFrameError
+from genshin_ai.perception.replay import (
+    ProcessedFrameReplaySource,
+    ReplayEndOfSequenceError,
+    ReplayFrameError,
+)
 from genshin_ai.perception.screen_capture import (
     MssScreenCaptureSource,
     ScreenCaptureDependencyError,
@@ -388,18 +392,20 @@ def _run_replay_smoke_command(
         frames_loaded = 0
         while frames_loaded < args.limit:
             try:
-                frame = source.load_next_frame()
-            except ReplayFrameError as error:
-                if frames_loaded > 0 and str(error) == "No more replay frames are available.":
+                loaded = source.load_next()
+            except ReplayEndOfSequenceError:
+                if frames_loaded > 0:
                     break
                 raise
 
             frames_loaded += 1
+            event_data = dict[str, JsonValue](loaded.frame.metadata())
+            event_data["frame_path"] = str(loaded.path)
             event_logger.emit(
                 LogEvent(
                     event="replay_frame_loaded",
                     module="perception.replay",
-                    data=dict[str, JsonValue](frame.metadata()),
+                    data=event_data,
                 )
             )
     except ReplayFrameError as error:

@@ -229,6 +229,8 @@ The `replay-smoke` command reads processed binary PPM (`P6`) frames from a
 directory and returns deterministic RGB `ProcessedFrame` objects for future
 perception tests. It emits replay events to the run JSONL log and does not capture
 the screen, perform OCR, run semantic vision, automate input, or call models.
+Each `replay_frame_loaded` event includes frame metadata and `frame_path` for
+auditability.
 
 A typical manual replay flow is:
 
