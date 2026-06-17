@@ -1,6 +1,7 @@
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -13,11 +14,114 @@ from genshin_ai.perception.screen_capture import (
 )
 
 
+class FakeScreenshot:
+    width = 2
+    height = 1
+    raw = bytes((10, 20, 30, 255, 40, 50, 60, 255))
+
+
+class FakeMssInstance:
+    def __init__(self, monitors: list[dict[str, int]]) -> None:
+        self.monitors = monitors
+        self.grabbed_monitors: list[dict[str, int]] = []
+        self.close_calls = 0
+
+    def grab(self, monitor: dict[str, int]) -> FakeScreenshot:
+        self.grabbed_monitors.append(monitor)
+        return FakeScreenshot()
+
+    def close(self) -> None:
+        self.close_calls += 1
+
+
+class FakeMssModule(ModuleType):
+    def __init__(self, monitors: list[dict[str, int]] | None = None) -> None:
+        super().__init__("mss")
+        self.monitors = monitors or [
+            {"left": 0, "top": 0, "width": 3840, "height": 1080},
+            {"left": 0, "top": 0, "width": 1920, "height": 1080},
+        ]
+        self.instances: list[FakeMssInstance] = []
+        self.mss_calls = 0
+
+    def mss(self) -> FakeMssInstance:
+        self.mss_calls += 1
+        instance = FakeMssInstance(self.monitors)
+        self.instances.append(instance)
+        return instance
+
+
 def test_missing_mss_dependency_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "mss", None)
 
     with pytest.raises(ScreenCaptureDependencyError, match="pip install"):
         MssScreenCaptureSource()
+
+
+def test_mss_context_is_created_once_and_grab_runs_per_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_mss = FakeMssModule()
+    monkeypatch.setitem(sys.modules, "mss", fake_mss)
+
+    source = MssScreenCaptureSource()
+    try:
+        first_frame = source.capture_frame()
+        second_frame = source.capture_frame()
+    finally:
+        source.close()
+
+    instance = fake_mss.instances[0]
+    assert fake_mss.mss_calls == 1
+    assert len(instance.grabbed_monitors) == 2
+    assert instance.grabbed_monitors == [fake_mss.monitors[1], fake_mss.monitors[1]]
+    assert first_frame.frame_id == 1
+    assert second_frame.frame_id == 2
+    assert first_frame.width == 2
+    assert first_frame.height == 1
+    assert first_frame.data == FakeScreenshot.raw
+
+
+def test_mss_context_manager_closes_capture(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_mss = FakeMssModule()
+    monkeypatch.setitem(sys.modules, "mss", fake_mss)
+
+    with MssScreenCaptureSource() as source:
+        frame = source.capture_frame()
+
+    assert frame.frame_id == 1
+    assert fake_mss.instances[0].close_calls == 1
+
+
+def test_mss_close_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_mss = FakeMssModule()
+    monkeypatch.setitem(sys.modules, "mss", fake_mss)
+
+    source = MssScreenCaptureSource()
+    source.close()
+    source.close()
+
+    assert fake_mss.instances[0].close_calls == 1
+
+
+def test_mss_capture_after_close_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_mss = FakeMssModule()
+    monkeypatch.setitem(sys.modules, "mss", fake_mss)
+    source = MssScreenCaptureSource()
+    source.close()
+
+    with pytest.raises(RuntimeError, match="closed"):
+        source.capture_frame()
+
+
+def test_mss_invalid_monitor_index_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_mss = FakeMssModule()
+    monkeypatch.setitem(sys.modules, "mss", fake_mss)
+
+    with pytest.raises(ValueError, match="Monitor index 2 is not available"):
+        MssScreenCaptureSource(monitor_index=2)
+
+    assert fake_mss.instances[0].close_calls == 1
 
 
 def test_save_frame_sample_ppm_writes_file(tmp_path: Path) -> None:

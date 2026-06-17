@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from importlib import import_module
 from pathlib import Path
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 from genshin_ai.perception.frame import CapturedFrame
 
@@ -21,19 +22,29 @@ class MssScreenCaptureSource:
     def __init__(self, monitor_index: int = 1) -> None:
         self.monitor_index = monitor_index
         self._mss_module = _import_mss()
+        self._screen_capture: Any | None = self._mss_module.mss()
+        self._monitor: Any | None = None
+        self._closed = False
         self._next_frame_id = 1
+
+        try:
+            monitors = self._screen_capture.monitors
+            if monitor_index < 0 or monitor_index >= len(monitors):
+                raise ValueError(
+                    f"Monitor index {monitor_index} is not available. "
+                    f"Detected {len(monitors) - 1} monitor(s)."
+                )
+            self._monitor = monitors[monitor_index]
+        except Exception:
+            self.close()
+            raise
 
     def capture_frame(self) -> CapturedFrame:
         """Capture one frame from the configured monitor."""
-        with self._mss_module.mss() as screen_capture:
-            monitors = screen_capture.monitors
-            if self.monitor_index >= len(monitors):
-                raise ValueError(
-                    f"Monitor index {self.monitor_index} is not available. "
-                    f"Detected {len(monitors) - 1} monitor(s)."
-                )
+        if self._closed or self._screen_capture is None or self._monitor is None:
+            raise RuntimeError("Cannot capture frame after MssScreenCaptureSource has been closed.")
 
-            screenshot = screen_capture.grab(monitors[self.monitor_index])
+        screenshot = self._screen_capture.grab(self._monitor)
 
         frame_id = self._next_frame_id
         self._next_frame_id += 1
@@ -45,6 +56,41 @@ class MssScreenCaptureSource:
             source=self.source,
             data=bytes(screenshot.raw),
         )
+
+    def close(self) -> None:
+        """Release the underlying mss capture resource."""
+        if self._closed:
+            return
+
+        screen_capture = self._screen_capture
+        self._screen_capture = None
+        self._monitor = None
+        self._closed = True
+
+        if screen_capture is None:
+            return
+
+        close = getattr(screen_capture, "close", None)
+        if callable(close):
+            close()
+            return
+
+        exit_context = getattr(screen_capture, "__exit__", None)
+        if callable(exit_context):
+            exit_context(None, None, None)
+
+    def __enter__(self) -> Self:
+        """Return the active capture source for context-manager usage."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Release the capture resource when leaving a context manager."""
+        self.close()
 
 
 def save_frame_sample_ppm(frame: CapturedFrame, output_path: Path | str) -> Path:

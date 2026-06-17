@@ -249,13 +249,14 @@ def _run_screen_capture_smoke_command(
     elif args.preprocess:
         on_frame_captured = preprocess_only
 
-    metrics = run_capture_smoke_test(
-        source=source,
-        logger=event_logger,
-        frame_count=args.frames,
-        target_fps=config.capture.target_fps,
-        on_frame_captured=on_frame_captured,
-    )
+    with source:
+        metrics = run_capture_smoke_test(
+            source=source,
+            logger=event_logger,
+            frame_count=args.frames,
+            target_fps=config.capture.target_fps,
+            on_frame_captured=on_frame_captured,
+        )
 
     event_logger.emit(
         LogEvent(
@@ -309,18 +310,19 @@ def _run_capture_benchmark_command(
         )
         raise SystemExit(str(error)) from error
 
-    report = run_capture_benchmark(
-        source=source,
-        runtime=runtime,
-        session=session,
-        logger=event_logger,
-        frames=args.frames,
-        preprocess=args.preprocess,
-        preprocess_backend=preprocess_backend,
-        process_width=config.capture.process_width,
-        process_height=config.capture.process_height,
-        save_every=args.save_every,
-    )
+    with source:
+        report = run_capture_benchmark(
+            source=source,
+            runtime=runtime,
+            session=session,
+            logger=event_logger,
+            frames=args.frames,
+            preprocess=args.preprocess,
+            preprocess_backend=preprocess_backend,
+            process_width=config.capture.process_width,
+            process_height=config.capture.process_height,
+            save_every=args.save_every,
+        )
     report_path = save_capture_benchmark_report(
         report,
         session.artifacts_dir / "capture_benchmark.json",

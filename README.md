@@ -196,6 +196,11 @@ The `screen-capture-smoke` command uses the optional `mss` backend to capture th
 primary monitor. It is for manual observability testing only; it does not inspect
 game memory, automate input, or require Genshin Impact to be open.
 
+The real screen-capture backend keeps one `mss` capture context open for the
+duration of the smoke test or benchmark run. This keeps per-frame measurements
+focused on `grab()` latency instead of repeatedly measuring `mss` setup and
+teardown overhead.
+
 When `--preprocess` is enabled, captured BGRA frames are converted to RGB and
 resized to `capture.process_width` x `capture.process_height` from the loaded
 configuration. Processed samples are written as PPM files under the run captures
@@ -209,4 +214,6 @@ is added.
 The `capture-benchmark` command writes `capture_benchmark.json` under the run
 artifacts directory with FPS, capture latency, preprocessing latency, failures, and
 sample counts. When preprocessing is enabled, the report also records the
-`preprocess_backend` used for the run.
+`preprocess_backend` used for the run. Use `average_capture_ms`,
+`average_total_frame_ms`, and `actual_fps` to compare capture backend changes
+before and after optimization commits.

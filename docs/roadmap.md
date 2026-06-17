@@ -213,6 +213,27 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.5 - Persistent Screen Capture Context
+
+Goal: reduce per-frame capture overhead before adding OCR or semantic vision.
+
+Tasks:
+
+- keep one `mss` capture context open per `MssScreenCaptureSource` instance
+- cache the selected monitor during initialization
+- make real capture smoke tests and benchmarks close the capture resource explicitly
+- add unit tests with fake `mss` objects instead of real monitors
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `capture_frame()` calls `grab()` without recreating the `mss` context per frame
+- `capture-benchmark` can compare `average_capture_ms` before and after the change
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction
