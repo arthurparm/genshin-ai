@@ -165,6 +165,31 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 1.3 - Capture Benchmark Reporting
+
+Goal: measure real capture and preprocessing performance before adding OCR or vision models.
+
+Tasks:
+
+- add CaptureBenchmarkReport
+- benchmark capture latency
+- benchmark preprocessing latency
+- measure actual FPS
+- save benchmark JSON reports
+- optionally save benchmark samples
+- log benchmark start, frame, and finish events
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `capture-benchmark --frames 30` writes `capture_benchmark.json`
+- `capture-benchmark --frames 30 --preprocess` reports preprocessing latency
+- reports include FPS, average capture ms, average preprocess ms, failures, and samples saved
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - implement screen capture abstraction

@@ -8,6 +8,10 @@ from genshin_ai.core.config import AppConfig, load_config
 from genshin_ai.core.logging import JsonlEventLogger, JsonValue, LogEvent, configure_console_logging
 from genshin_ai.core.runtime import RuntimeContext
 from genshin_ai.core.session import RunSession, create_run_session
+from genshin_ai.perception.benchmark import (
+    run_capture_benchmark,
+    save_capture_benchmark_report,
+)
 from genshin_ai.perception.capture import MockCaptureSource
 from genshin_ai.perception.frame import CapturedFrame
 from genshin_ai.perception.metrics import run_capture_smoke_test
@@ -50,6 +54,17 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "screen-capture-smoke":
         _run_screen_capture_smoke_command(
+            args,
+            config,
+            config_source,
+            runtime,
+            session,
+            event_logger,
+        )
+        return
+
+    if args.command == "capture-benchmark":
+        _run_capture_benchmark_command(
             args,
             config,
             config_source,
@@ -258,6 +273,61 @@ def _run_screen_capture_smoke_command(
     print(f"Samples saved: {saved_samples}")
 
 
+def _run_capture_benchmark_command(
+    args: argparse.Namespace,
+    config: AppConfig,
+    config_source: str,
+    runtime: RuntimeContext,
+    session: RunSession,
+    event_logger: JsonlEventLogger,
+) -> None:
+    try:
+        source = MssScreenCaptureSource()
+    except ScreenCaptureDependencyError as error:
+        event_logger.emit(
+            LogEvent(
+                event="screen_capture_dependency_missing",
+                module="perception.screen_capture",
+                level="ERROR",
+                message=str(error),
+            )
+        )
+        raise SystemExit(str(error)) from error
+
+    report = run_capture_benchmark(
+        source=source,
+        runtime=runtime,
+        session=session,
+        logger=event_logger,
+        frames=args.frames,
+        preprocess=args.preprocess,
+        process_width=config.capture.process_width,
+        process_height=config.capture.process_height,
+        save_every=args.save_every,
+    )
+    report_path = save_capture_benchmark_report(
+        report,
+        session.artifacts_dir / "capture_benchmark.json",
+    )
+
+    print(f"genshin-ai {__version__}")
+    print(f"Run ID: {runtime.run_id}")
+    print(f"Phase: {runtime.project_phase}")
+    print(f"Config: {config_source}")
+    print(f"Run session: {session.root_dir}")
+    print(f"Capture source: {source.source}")
+    print(f"Frames requested: {report.frames_requested}")
+    print(f"Frames captured: {report.frames_captured}")
+    print(f"Failed frames: {report.failed_frames}")
+    print(f"Preprocess: {report.preprocess_enabled}")
+    print(f"Actual FPS: {report.actual_fps:.2f}")
+    print(f"Average capture ms: {report.average_capture_ms:.2f}")
+    print(f"Average preprocess ms: {report.average_preprocess_ms:.2f}")
+    print(f"Average total frame ms: {report.average_total_frame_ms:.2f}")
+    print(f"Samples saved: {report.samples_saved}")
+    print(f"Report: {report_path}")
+
+
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Genshin AI research agent CLI.")
     parser.add_argument(
@@ -298,6 +368,33 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Preprocess captured frames to configured RGB resolution.",
     )
     screen_capture_smoke_parser.add_argument(
+        "--config",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help="Optional TOML configuration file path.",
+    )
+    capture_benchmark_parser = subparsers.add_parser(
+        "capture-benchmark",
+        help="Run an operational screen-capture benchmark.",
+    )
+    capture_benchmark_parser.add_argument(
+        "--frames",
+        type=int,
+        default=60,
+        help="Number of frames to benchmark.",
+    )
+    capture_benchmark_parser.add_argument(
+        "--preprocess",
+        action="store_true",
+        help="Benchmark preprocessing to configured RGB resolution.",
+    )
+    capture_benchmark_parser.add_argument(
+        "--save-every",
+        type=int,
+        default=None,
+        help="Save one sample every N attempted frames.",
+    )
+    capture_benchmark_parser.add_argument(
         "--config",
         type=Path,
         default=argparse.SUPPRESS,

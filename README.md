@@ -150,6 +150,14 @@ python -m genshin_ai.cli screen-capture-smoke --frames 5 --save-samples
 python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --save-samples
 ```
 
+Run an operational capture benchmark:
+
+```powershell
+python -m genshin_ai.cli capture-benchmark --frames 30
+python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess
+python -m genshin_ai.cli capture-benchmark --frames 30 --preprocess --save-every 10
+```
+
 The CLI creates one run-scoped directory per execution:
 
 ```text
@@ -184,3 +192,7 @@ When `--preprocess` is enabled, captured BGRA frames are converted to RGB and
 resized to `capture.process_width` x `capture.process_height` from the loaded
 configuration. Processed samples are written as PPM files under the run captures
 directory when `--save-samples` is also enabled.
+
+The `capture-benchmark` command writes `capture_benchmark.json` under the run
+artifacts directory with FPS, capture latency, preprocessing latency, failures, and
+sample counts.
