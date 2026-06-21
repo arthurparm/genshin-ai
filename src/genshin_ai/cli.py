@@ -32,6 +32,10 @@ from genshin_ai.perception.replay import (
     ReplayEndOfSequenceError,
     ReplayFrameError,
 )
+from genshin_ai.perception.roi_manifest import (
+    extract_roi_batch,
+    save_roi_manifest,
+)
 from genshin_ai.perception.screen_capture import (
     MssScreenCaptureSource,
     ScreenCaptureDependencyError,
@@ -99,6 +103,17 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "roi-smoke":
         _run_roi_smoke_command(
+            args,
+            config,
+            config_source,
+            runtime,
+            session,
+            event_logger,
+        )
+        return
+
+    if args.command == "roi-batch":
+        _run_roi_batch_command(
             args,
             config,
             config_source,
@@ -579,6 +594,85 @@ def _run_roi_smoke_command(
     print(f"Samples saved: {samples_saved}")
 
 
+def _run_roi_batch_command(
+    args: argparse.Namespace,
+    config: AppConfig,
+    config_source: str,
+    runtime: RuntimeContext,
+    session: RunSession,
+    event_logger: JsonlEventLogger,
+) -> None:
+    try:
+        regions = _resolve_roi_batch_regions(args, config)
+        manifest = extract_roi_batch(
+            frames_dir=args.frames_dir,
+            regions=regions,
+            run_id=runtime.run_id,
+            artifacts_dir=session.artifacts_dir,
+            limit=args.limit,
+            save_samples=args.save_samples,
+            region_source="config",
+            event_logger=event_logger,
+        )
+        manifest_path = save_roi_manifest(
+            manifest,
+            session.artifacts_dir / "roi_manifest.json",
+        )
+    except (ValueError, ReplayFrameError, RegionExtractionError) as error:
+        event_logger.emit(
+            LogEvent(
+                event="roi_batch_failed",
+                module="perception.roi_manifest",
+                level="ERROR",
+                message=str(error),
+                data={
+                    "frames_dir": str(args.frames_dir),
+                    "regions": args.regions,
+                    "limit": args.limit,
+                    "save_samples": args.save_samples,
+                },
+            )
+        )
+        raise SystemExit(str(error)) from error
+
+    event_logger.emit(
+        LogEvent(
+            event="roi_batch_manifest_saved",
+            module="perception.roi_manifest",
+            data={
+                "manifest_path": str(manifest_path),
+                "frames_dir": str(args.frames_dir),
+                "entries": len(manifest.entries),
+            },
+        )
+    )
+    event_logger.emit(
+        LogEvent(
+            event="roi_batch_finished",
+            module="perception.roi_manifest",
+            data={
+                "frames_dir": str(args.frames_dir),
+                "limit": args.limit,
+                "regions": [region.metadata() for region in manifest.regions],
+                "entries": len(manifest.entries),
+                "manifest_path": str(manifest_path),
+                "save_samples": args.save_samples,
+            },
+        )
+    )
+
+    print(f"genshin-ai {__version__}")
+    print(f"Run ID: {runtime.run_id}")
+    print(f"Phase: {runtime.project_phase}")
+    print(f"Config: {config_source}")
+    print(f"Run session: {session.root_dir}")
+    print(f"Replay frames dir: {args.frames_dir}")
+    print(f"Regions: {', '.join(region.name for region in manifest.regions)}")
+    print(f"Replay limit: {args.limit}")
+    print(f"Manifest entries: {len(manifest.entries)}")
+    print(f"Manifest: {manifest_path}")
+
+
 def _resolve_roi_region(args: argparse.Namespace, config: AppConfig) -> tuple[RegionSpec, str]:
     manual_values = {
         "x": args.x,
@@ -627,6 +721,30 @@ def _resolve_roi_region(args: argparse.Namespace, config: AppConfig) -> tuple[Re
         ),
         "manual",
     )
+
+
+def _resolve_roi_batch_regions(
+    args: argparse.Namespace,
+    config: AppConfig,
+) -> tuple[RegionSpec, ...]:
+    if not config.regions:
+        raise ValueError("ROI batch requires at least one configured ROI preset.")
+
+    if args.regions is None:
+        region_names = tuple(config.regions)
+    else:
+        region_names = tuple(name.strip() for name in args.regions.split(",") if name.strip())
+        if not region_names:
+            raise ValueError("ROI batch --regions must include at least one preset name.")
+
+    regions: list[RegionSpec] = []
+    for region_name in region_names:
+        region_config = config.regions.get(region_name)
+        if region_config is None:
+            raise ValueError(f"Unknown ROI region preset: {region_name}")
+        regions.append(region_spec_from_config(region_name, region_config))
+
+    return tuple(regions)
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -791,6 +909,38 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Save extracted ROI samples as PPM files.",
     )
     roi_smoke_parser.add_argument(
+        "--config",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help="Optional TOML configuration file path.",
+    )
+    roi_batch_parser = subparsers.add_parser(
+        "roi-batch",
+        help="Extract configured ROI presets from processed PPM replay frames.",
+    )
+    roi_batch_parser.add_argument(
+        "--frames-dir",
+        type=Path,
+        required=True,
+        help="Directory containing processed .ppm replay frames.",
+    )
+    roi_batch_parser.add_argument(
+        "--regions",
+        default=None,
+        help="Comma-separated configured ROI preset names. Defaults to all presets.",
+    )
+    roi_batch_parser.add_argument(
+        "--limit",
+        type=int,
+        default=1,
+        help="Maximum number of replay frames to process.",
+    )
+    roi_batch_parser.add_argument(
+        "--save-samples",
+        action="store_true",
+        help="Save extracted ROI samples as PPM files.",
+    )
+    roi_batch_parser.add_argument(
         "--config",
         type=Path,
         default=argparse.SUPPRESS,

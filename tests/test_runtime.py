@@ -19,6 +19,6 @@ def test_runtime_context_serializes_to_dict() -> None:
     assert payload["run_id"] == "test-run"
     assert (
         payload["project_phase"]
-        == "FASE 2.0 - ROI Extraction and Perception Observation Contracts"
+        == "FASE 2.2 - ROI Batch Extraction Manifest"
     )
     assert "started_at_utc" in payload

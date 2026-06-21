@@ -363,6 +363,39 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 2.2 - ROI Batch Extraction Manifest
+
+Goal: extract configured ROI presets across processed replay frames and produce
+an audit-ready JSON manifest before OCR, HUD parsing, or minimap parsing exists.
+
+Tasks:
+
+- define immutable `RoiManifestEntry`
+- define immutable `RoiManifest`
+- serialize ROI manifests to deterministic JSON
+- extract every requested ROI preset from each replay frame
+- support bounded frame limits and early replay end after loaded frames
+- optionally save ROI sample PPM files under run artifacts
+- add `roi-batch` CLI command for all presets or selected presets
+- emit batch start, per-region extraction, manifest-saved, and finish events
+- keep tests independent from real screen capture
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `ruff check .` passes
+- `mypy src tests` passes
+- `roi-batch --frames-dir <dir>` works with configured presets
+- `roi-batch --regions minimap` selects one configured preset
+- missing presets and empty preset config fail with clear errors
+- manifest contains one entry per loaded frame per region
+- sample paths are recorded when `--save-samples` is used
+- extracted events include `frame_path`, `region_name`, and `region_source`
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - detect screen mode

@@ -52,11 +52,10 @@ Logs / Replay / Evaluation
 
 ## Current Phase
 
-FASE 2.0 - ROI Extraction and Perception Observation Contracts
+FASE 2.2 - ROI Batch Extraction Manifest
 
-The current goal is to create a minimal structural perception layer that extracts
-explicit RGB regions from processed replay frames before adding OCR, semantic
-vision, LLM calls, or execution modules.
+The current goal is to create audit-ready ROI manifests from processed replay
+frames before adding OCR, semantic vision, LLM calls, or execution modules.
 
 ## Hardware Target
 
@@ -182,6 +181,13 @@ python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y
 python -m genshin_ai.cli --config config.example.toml roi-smoke --frames-dir runs/<run_id>/captures --region minimap --limit 1
 ```
 
+Run ROI batch extraction from configured presets and write an audit manifest:
+
+```powershell
+python -m genshin_ai.cli --config config.example.toml roi-batch --frames-dir runs/<run_id>/captures --limit 10 --save-samples
+python -m genshin_ai.cli --config config.example.toml roi-batch --frames-dir runs/<run_id>/captures --regions minimap,interaction_prompt --limit 10 --save-samples
+```
+
 The CLI creates one run-scoped directory per execution:
 
 ```text
@@ -266,6 +272,18 @@ PPM files under `runs/<run_id>/artifacts/roi/`. This command only prepares
 structural perception input for future OCR, HUD parsing, minimap parsing, and
 evaluation; it does not interpret image content.
 
+The `roi-batch` command extracts one or more configured ROI presets for every
+loaded replay frame and saves `runs/<run_id>/artifacts/roi_manifest.json`. If
+`--regions` is omitted, all configured presets are used. If `--save-samples` is
+provided, extracted ROI samples are saved under `runs/<run_id>/artifacts/roi/`
+and each manifest entry records its `sample_path`. The command emits
+`roi_batch_started`, `roi_batch_region_extracted`,
+`roi_batch_manifest_saved`, and `roi_batch_finished` events. Each extracted
+entry records `frame_path`, `region_name`, `region_source`, coordinates, source
+frame dimensions, pixel format, and optional sample path. This remains a
+structural replay/evaluation primitive only; it does not run OCR, semantic
+vision, or gameplay automation.
+
 A typical manual replay flow is:
 
 ```powershell
@@ -273,4 +291,5 @@ python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --preproce
 python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures --limit 5
 python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1 --save-samples
 python -m genshin_ai.cli --config config.example.toml roi-smoke --frames-dir runs/<run_id>/captures --region minimap --limit 1 --save-samples
+python -m genshin_ai.cli --config config.example.toml roi-batch --frames-dir runs/<run_id>/captures --regions minimap,interaction_prompt --limit 5 --save-samples
 ```
