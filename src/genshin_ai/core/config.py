@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tomllib
-from dataclasses import asdict, dataclass, fields, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +70,26 @@ class ModelRoutingConfig:
 
 
 @dataclass(frozen=True)
+class RegionConfig:
+    """Configuration for one named region of interest."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def __post_init__(self) -> None:
+        for field_name in ("x", "y", "width", "height"):
+            value = getattr(self, field_name)
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise ValueError(f"Region config '{field_name}' must be an integer.")
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the config into JSON-compatible values."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Root application configuration."""
 
@@ -77,6 +97,7 @@ class AppConfig:
     paths: RuntimePathsConfig = RuntimePathsConfig()
     capture: CaptureConfig = CaptureConfig()
     model_routing: ModelRoutingConfig = ModelRoutingConfig()
+    regions: dict[str, RegionConfig] = field(default_factory=dict)
 
     @classmethod
     def default(cls) -> AppConfig:
@@ -90,6 +111,7 @@ class AppConfig:
             "paths": self.paths.to_dict(),
             "capture": self.capture.to_dict(),
             "model_routing": self.model_routing.to_dict(),
+            "regions": {name: region.to_dict() for name, region in self.regions.items()},
         }
 
 
@@ -98,6 +120,7 @@ _SECTION_TYPES = {
     "paths": RuntimePathsConfig,
     "capture": CaptureConfig,
     "model_routing": ModelRoutingConfig,
+    "regions": RegionConfig,
 }
 
 
@@ -120,6 +143,10 @@ def load_config(path: Path | str | None = None) -> AppConfig:
     for section_name, section_values in raw_config.items():
         if not isinstance(section_values, dict):
             raise ValueError(f"Config section '{section_name}' must be a table.")
+
+        if section_name == "regions":
+            config = replace(config, regions=_load_regions(section_values))
+            continue
 
         _validate_section_keys(section_name, section_values)
         current_section = getattr(config, section_name)
@@ -144,3 +171,25 @@ def _validate_section_keys(section_name: str, section_values: dict[str, Any]) ->
     if unknown_keys:
         unknown = ", ".join(sorted(unknown_keys))
         raise ValueError(f"Unknown config key(s) in section '{section_name}': {unknown}")
+
+
+def _load_regions(raw_regions: dict[str, Any]) -> dict[str, RegionConfig]:
+    from genshin_ai.perception.regions import region_spec_from_config
+
+    regions: dict[str, RegionConfig] = {}
+    for region_name, region_values in raw_regions.items():
+        if not isinstance(region_values, dict):
+            raise ValueError(f"Region preset '{region_name}' must be a table.")
+
+        _validate_section_keys("regions", region_values)
+        try:
+            region_config = RegionConfig(**region_values)
+            region_spec_from_config(region_name, region_config)
+        except TypeError as error:
+            raise ValueError(f"Invalid region preset '{region_name}': {error}") from error
+        except ValueError as error:
+            raise ValueError(f"Invalid region preset '{region_name}': {error}") from error
+
+        regions[region_name] = region_config
+
+    return regions

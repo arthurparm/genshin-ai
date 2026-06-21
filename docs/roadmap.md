@@ -335,6 +335,34 @@ Exit criteria:
 - no input automation exists
 - no LLM call exists
 
+## FASE 2.1 - Configurable ROI Presets
+
+Goal: make ROI extraction reproducible through named, validated presets before
+OCR, HUD parsing, or minimap parsing exists.
+
+Tasks:
+
+- add immutable `RegionConfig` presets to typed configuration
+- load `[regions.<name>]` tables from TOML
+- reuse `RegionSpec` validation for configured presets
+- restrict region names to safe log and filename identifiers
+- support `roi-smoke --region <preset>` alongside manual coordinates
+- include `region_source` and region metadata in ROI events
+- reject unknown presets and ambiguous manual/preset CLI input
+
+Exit criteria:
+
+- `python -m pytest` passes
+- `ruff check .` passes
+- `mypy src tests` passes
+- manual `roi-smoke` coordinate mode still works
+- configured `roi-smoke --region minimap` works with valid processed PPM input
+- invalid region names and invalid coordinates fail with clear errors
+- no OCR exists
+- no semantic vision exists
+- no input automation exists
+- no LLM call exists
+
 Tasks:
 
 - detect screen mode

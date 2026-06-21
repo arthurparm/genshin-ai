@@ -179,6 +179,7 @@ Run a region-of-interest smoke test from processed PPM replay frames:
 ```powershell
 python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1
 python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1 --save-samples
+python -m genshin_ai.cli --config config.example.toml roi-smoke --frames-dir runs/<run_id>/captures --region minimap --limit 1
 ```
 
 The CLI creates one run-scoped directory per execution:
@@ -200,9 +201,23 @@ Configuration is loaded from safe defaults unless a TOML file is provided with
 Use `config.example.toml` as the versioned reference. Local machine-specific config
 should be stored in `config.local.toml`, which is ignored by Git.
 
-Current configuration is limited to logging, runtime output paths, future capture
-settings, and future model-routing settings. Capture and model routing are disabled
-by default and are not implemented in the current phase.
+Current configuration covers logging, runtime output paths, future capture settings,
+future model-routing settings, and named ROI presets. Capture and model routing are
+disabled by default and are not implemented in the current phase.
+
+ROI presets are declared under `[regions.<name>]` and use processed-frame
+coordinates:
+
+```toml
+[regions.minimap]
+x = 1120
+y = 40
+width = 140
+height = 140
+```
+
+Region names are restricted to letters, numbers, underscores, and hyphens so logs
+and saved ROI samples can use the same name safely.
 
 The `capture-smoke` command uses a mock capture source. It does not capture the real
 screen and does not interact with Genshin Impact.
@@ -241,13 +256,15 @@ Each `replay_frame_loaded` event includes frame metadata and `frame_path` for
 auditability.
 
 The `roi-smoke` command reads the same processed PPM replay input and extracts a
-bounded RGB region by explicit pixel coordinates. It emits `roi_smoke_started`,
-`roi_extracted`, optional `roi_sample_saved`, and `roi_smoke_finished` events.
-Each `roi_extracted` event includes region metadata, `source_frame_id`, and
-`frame_path`. Saved ROI samples are written as PPM files under
-`runs/<run_id>/artifacts/roi/`. This command only prepares structural perception
-input for future OCR, HUD parsing, minimap parsing, and evaluation; it does not
-interpret image content.
+bounded RGB region either by explicit pixel coordinates or by a configured
+`--region` preset. It rejects ambiguous calls that combine preset mode with manual
+coordinates. It emits `roi_smoke_started`, `roi_extracted`, optional
+`roi_sample_saved`, and `roi_smoke_finished` events. Each ROI event includes
+`region_source` (`manual` or `config`), region metadata, `source_frame_id` where
+applicable, and `frame_path` for extracted frames. Saved ROI samples are written as
+PPM files under `runs/<run_id>/artifacts/roi/`. This command only prepares
+structural perception input for future OCR, HUD parsing, minimap parsing, and
+evaluation; it does not interpret image content.
 
 A typical manual replay flow is:
 
@@ -255,4 +272,5 @@ A typical manual replay flow is:
 python -m genshin_ai.cli screen-capture-smoke --frames 5 --preprocess --preprocess-backend pillow --save-samples
 python -m genshin_ai.cli replay-smoke --frames-dir runs/<run_id>/captures --limit 5
 python -m genshin_ai.cli roi-smoke --frames-dir runs/<run_id>/captures --x 0 --y 0 --width 100 --height 100 --name test_region --limit 1 --save-samples
+python -m genshin_ai.cli --config config.example.toml roi-smoke --frames-dir runs/<run_id>/captures --region minimap --limit 1 --save-samples
 ```

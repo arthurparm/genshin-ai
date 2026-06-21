@@ -20,3 +20,15 @@ save_sample_frames = false
 enabled = false
 provider = "none"
 planner_model = "none"
+
+[regions.minimap]
+x = 1120
+y = 40
+width = 140
+height = 140
+
+[regions.interaction_prompt]
+x = 420
+y = 520
+width = 440
+height = 90

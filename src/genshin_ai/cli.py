@@ -24,6 +24,7 @@ from genshin_ai.perception.regions import (
     RegionExtractionError,
     RegionSpec,
     extract_region,
+    region_spec_from_config,
     save_region_sample_ppm,
 )
 from genshin_ai.perception.replay import (
@@ -470,13 +471,7 @@ def _run_roi_smoke_command(
         raise SystemExit("ROI smoke frame limit must be positive.")
 
     try:
-        region = RegionSpec(
-            name=args.name,
-            x=args.x,
-            y=args.y,
-            width=args.width,
-            height=args.height,
-        )
+        region, region_source = _resolve_roi_region(args, config)
     except ValueError as error:
         raise SystemExit(str(error)) from error
 
@@ -488,7 +483,8 @@ def _run_roi_smoke_command(
                 "frames_dir": str(args.frames_dir),
                 "limit": args.limit,
                 "save_samples": args.save_samples,
-                "region": region_metadata(region),
+                "region_source": region_source,
+                "region": region.metadata(),
                 "config_source": config_source,
                 "config": config.to_dict(),
             },
@@ -513,6 +509,8 @@ def _run_roi_smoke_command(
             event_data = dict[str, JsonValue](region_frame.metadata())
             event_data["source_frame_id"] = loaded.frame.frame_id
             event_data["frame_path"] = str(loaded.path)
+            event_data["region_source"] = region_source
+            event_data["region"] = region.metadata()
             event_logger.emit(
                 LogEvent(
                     event="roi_extracted",
@@ -535,6 +533,8 @@ def _run_roi_smoke_command(
                         module="perception.regions",
                         data={
                             **dict[str, JsonValue](region_frame.metadata()),
+                            "region_source": region_source,
+                            "region": region.metadata(),
                             "path": str(output_path),
                             "frame_path": str(loaded.path),
                         },
@@ -579,15 +579,54 @@ def _run_roi_smoke_command(
     print(f"Samples saved: {samples_saved}")
 
 
-def region_metadata(region: RegionSpec) -> dict[str, str | int]:
-    """Return JSON-compatible region spec metadata."""
-    return {
-        "name": region.name,
-        "x": region.x,
-        "y": region.y,
-        "width": region.width,
-        "height": region.height,
+def _resolve_roi_region(args: argparse.Namespace, config: AppConfig) -> tuple[RegionSpec, str]:
+    manual_values = {
+        "x": args.x,
+        "y": args.y,
+        "width": args.width,
+        "height": args.height,
+        "name": args.name,
     }
+
+    if args.region is not None:
+        provided_manual_args = [
+            f"--{name.replace('_', '-')}"
+            for name, value in manual_values.items()
+            if value is not None
+        ]
+        if provided_manual_args:
+            joined = ", ".join(provided_manual_args)
+            raise ValueError(
+                "ROI preset mode cannot be combined with manual region arguments: "
+                f"{joined}."
+            )
+
+        region_config = config.regions.get(args.region)
+        if region_config is None:
+            raise ValueError(f"Unknown ROI region preset: {args.region}")
+
+        return region_spec_from_config(args.region, region_config), "config"
+
+    missing_manual_args = [
+        f"--{name.replace('_', '-')}" for name, value in manual_values.items() if value is None
+    ]
+    if missing_manual_args:
+        joined = ", ".join(missing_manual_args)
+        raise ValueError(
+            "Manual ROI mode requires --x, --y, --width, --height, and --name. "
+            f"Missing: {joined}."
+        )
+
+    return (
+        RegionSpec(
+            name=args.name,
+            x=args.x,
+            y=args.y,
+            width=args.width,
+            height=args.height,
+        ),
+        "manual",
+    )
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -707,32 +746,37 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Directory containing processed .ppm replay frames.",
     )
     roi_smoke_parser.add_argument(
+        "--region",
+        default=None,
+        help="Named ROI preset from the loaded configuration.",
+    )
+    roi_smoke_parser.add_argument(
         "--x",
         type=int,
-        required=True,
+        default=None,
         help="Region left coordinate in processed-frame pixels.",
     )
     roi_smoke_parser.add_argument(
         "--y",
         type=int,
-        required=True,
+        default=None,
         help="Region top coordinate in processed-frame pixels.",
     )
     roi_smoke_parser.add_argument(
         "--width",
         type=int,
-        required=True,
+        default=None,
         help="Region width in processed-frame pixels.",
     )
     roi_smoke_parser.add_argument(
         "--height",
         type=int,
-        required=True,
+        default=None,
         help="Region height in processed-frame pixels.",
     )
     roi_smoke_parser.add_argument(
         "--name",
-        required=True,
+        default=None,
         help="Stable region name for logs and optional samples.",
     )
     roi_smoke_parser.add_argument(

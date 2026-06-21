@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from genshin_ai.perception.frame import ProcessedFrame
+
+if TYPE_CHECKING:
+    from genshin_ai.core.config import RegionConfig
+
+_SAFE_REGION_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 class RegionExtractionError(RuntimeError):
@@ -25,6 +32,10 @@ class RegionSpec:
     def __post_init__(self) -> None:
         if not self.name:
             raise ValueError("Region name must not be empty.")
+        if not _SAFE_REGION_NAME.fullmatch(self.name):
+            raise ValueError(
+                "Region name must contain only letters, numbers, underscores, or hyphens."
+            )
         if self.x < 0:
             raise ValueError("Region x must be non-negative.")
         if self.y < 0:
@@ -33,6 +44,16 @@ class RegionSpec:
             raise ValueError("Region width must be positive.")
         if self.height <= 0:
             raise ValueError("Region height must be positive.")
+
+    def metadata(self) -> dict[str, str | int]:
+        """Return JSON-compatible region spec metadata."""
+        return {
+            "name": self.name,
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+        }
 
 
 @dataclass(frozen=True)
@@ -63,6 +84,17 @@ class RegionFrame:
             "source_frame_height": self.source_frame_height,
             "pixel_format": self.pixel_format,
         }
+
+
+def region_spec_from_config(name: str, config: RegionConfig) -> RegionSpec:
+    """Build a validated region spec from a configured ROI preset."""
+    return RegionSpec(
+        name=name,
+        x=config.x,
+        y=config.y,
+        width=config.width,
+        height=config.height,
+    )
 
 
 def extract_region(frame: ProcessedFrame, region: RegionSpec) -> RegionFrame:

@@ -3,8 +3,10 @@ from pathlib import Path
 import pytest
 
 from genshin_ai.core.config import (
+    AppConfig,
     CaptureConfig,
     ModelRoutingConfig,
+    RegionConfig,
     load_config,
 )
 
@@ -17,6 +19,7 @@ def test_load_config_without_path_returns_safe_defaults() -> None:
     assert config.paths.runs_dir == "runs"
     assert config.capture == CaptureConfig()
     assert config.model_routing == ModelRoutingConfig()
+    assert config.regions == {}
 
 
 def test_capture_config_defaults_are_safe() -> None:
@@ -34,6 +37,73 @@ def test_model_routing_is_disabled_by_default() -> None:
     config = load_config()
 
     assert config.model_routing.enabled is False
+
+
+def test_region_config_loads_from_valid_toml(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[regions.minimap]
+x = 1120
+y = 40
+width = 140
+height = 140
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_file)
+
+    assert config.regions["minimap"] == RegionConfig(
+        x=1120,
+        y=40,
+        width=140,
+        height=140,
+    )
+
+
+def test_config_loads_multiple_region_presets(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[regions.minimap]
+x = 1120
+y = 40
+width = 140
+height = 140
+
+[regions.interaction_prompt]
+x = 420
+y = 520
+width = 440
+height = 90
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_file)
+
+    assert config.regions == {
+        "minimap": RegionConfig(x=1120, y=40, width=140, height=140),
+        "interaction_prompt": RegionConfig(x=420, y=520, width=440, height=90),
+    }
+
+
+def test_config_rejects_region_preset_with_invalid_coordinates(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[regions.minimap]
+x = 0
+y = 0
+width = 0
+height = 1
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Invalid region preset 'minimap'"):
+        load_config(config_file)
 
 
 def test_load_config_from_valid_toml(tmp_path: Path) -> None:
@@ -142,4 +212,15 @@ def test_config_serializes_to_dict() -> None:
         "process_height": 720,
         "preprocess_backend": "python",
         "save_sample_frames": False,
+    }
+    assert payload["regions"] == {}
+
+
+def test_config_serializes_region_presets_to_dict() -> None:
+    config = AppConfig(regions={"minimap": RegionConfig(x=1, y=2, width=3, height=4)})
+
+    payload = config.to_dict()
+
+    assert payload["regions"] == {
+        "minimap": {"x": 1, "y": 2, "width": 3, "height": 4}
     }
